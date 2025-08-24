@@ -4,9 +4,11 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from pathlib import Path
 
 from .queue_times import QueueTimesClient
 from .stats import RideStats
@@ -66,9 +68,7 @@ class DisneyWaitsService:
     def wait_times(
         self,
         park_id: int | str | None = None,
-        *,
-        is_open: bool | None = None,
-        is_unusually_low: bool | None = None,
+        **filters: Any,
     ) -> List[dict]:
         rides: List[RideInfo] = []
         if park_id is None:
@@ -94,12 +94,15 @@ class DisneyWaitsService:
                 "is_unusually_low": stats.is_unusually_low(),
             }
 
-            if is_open is not None and entry["is_open"] != is_open:
-                continue
-            if is_unusually_low is not None and entry["is_unusually_low"] != is_unusually_low:
-                continue
-
-            results.append(entry)
+            matched = True
+            for key, value in filters.items():
+                if value is None:
+                    continue
+                if entry.get(key) != value:
+                    matched = False
+                    break
+            if matched:
+                results.append(entry)
         return results
 
 client = QueueTimesClient()
@@ -133,16 +136,43 @@ async def shutdown() -> None:
 
 
 @app.get("/parks")
-async def parks() -> Dict[str, str]:
-    return {str(p.id): p.name for p in service.parks.values()}
+async def parks(id: str | None = None, name: str | None = None) -> Dict[str, str]:
+    data = {str(p.id): p.name for p in service.parks.values()}
+    if id is not None:
+        data = {pid: pname for pid, pname in data.items() if pid == id}
+    if name is not None:
+        data = {pid: pname for pid, pname in data.items() if pname == name}
+    return data
 
 
 @app.get("/wait_times")
 @app.get("/parks/wait_times")
 async def wait_times_endpoint(
     park_id: str | None = None,
+    id: str | None = None,
+    name: str | None = None,
+    current_wait: int | None = None,
+    mean: float | None = None,
+    stdev: float | None = None,
     is_open: bool | None = None,
+    recently_opened: bool | None = None,
     is_unusually_low: bool | None = None,
 ) -> List[dict]:
-    return service.wait_times(park_id, is_open=is_open, is_unusually_low=is_unusually_low)
+    return service.wait_times(
+        park_id,
+        id=id,
+        name=name,
+        current_wait=current_wait,
+        mean=mean,
+        stdev=stdev,
+        is_open=is_open,
+        recently_opened=recently_opened,
+        is_unusually_low=is_unusually_low,
+    )
+
+
+@app.get("/", response_class=HTMLResponse)
+async def web_index() -> str:
+    index_path = Path(__file__).with_name("index.html")
+    return index_path.read_text()
 
