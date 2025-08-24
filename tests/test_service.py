@@ -67,6 +67,15 @@ def test_wait_times_filters():
     assert [w["id"] for w in waits_not_low] == ["11"]
 
 
+def test_wait_times_accepts_int_park_id():
+    service = DisneyWaitsService(DummyClient())
+    import asyncio
+
+    asyncio.run(service.update())
+    assert service.wait_times(1) == service.wait_times("1")
+    assert service.wait_times(1, is_open=True)[0]["id"] == "10"
+
+
 class FlippingClient:
     def __init__(self) -> None:
         self.calls = 0

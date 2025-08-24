@@ -75,7 +75,7 @@ class DisneyWaitsService:
             for park in self.parks.values():
                 rides.extend(park.rides.values())
         else:
-            park = self.parks.get(park_id)
+            park = self.parks.get(str(park_id))
             if not park:
                 return []
             rides = list(park.rides.values())
