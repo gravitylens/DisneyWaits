@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from typing import Dict, List
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from pathlib import Path
 
 from .queue_times import QueueTimesClient
 from .stats import RideStats
@@ -145,4 +147,10 @@ async def wait_times_endpoint(
     is_unusually_low: bool | None = None,
 ) -> List[dict]:
     return service.wait_times(park_id, is_open=is_open, is_unusually_low=is_unusually_low)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def web_index() -> str:
+    index_path = Path(__file__).with_name("index.html")
+    return index_path.read_text()
 

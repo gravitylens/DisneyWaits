@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Disney Wait Times</title>
+</head>
+<body>
+  <h1>Disney Wait Times</h1>
+  <label for="park-select">Park:</label>
+  <select id="park-select">
+    <option value="">Select a park</option>
+  </select>
+  <table id="rides-table">
+    <thead>
+      <tr><th>Ride</th><th>Wait Time</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    async function loadParks() {
+      const response = await fetch('/parks');
+      const parks = await response.json();
+      const select = document.getElementById('park-select');
+      for (const [id, name] of Object.entries(parks)) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        select.appendChild(option);
+      }
+    }
+
+    async function loadRides(parkId) {
+      if (!parkId) {
+        return;
+      }
+      const response = await fetch(`/wait_times?park_id=${parkId}&is_open=true`);
+      let rides = await response.json();
+      rides.sort((a, b) => {
+        if (a.is_unusually_low && !b.is_unusually_low) return -1;
+        if (!a.is_unusually_low && b.is_unusually_low) return 1;
+        return (a.current_wait ?? 0) - (b.current_wait ?? 0);
+      });
+      const tbody = document.querySelector('#rides-table tbody');
+      tbody.innerHTML = '';
+      for (const ride of rides) {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.textContent = ride.name;
+        const waitCell = document.createElement('td');
+        waitCell.textContent = ride.current_wait;
+        row.appendChild(nameCell);
+        row.appendChild(waitCell);
+        tbody.appendChild(row);
+      }
+    }
+
+    document.getElementById('park-select').addEventListener('change', (e) => {
+      loadRides(e.target.value);
+    });
+
+    loadParks();
+  </script>
+</body>
+</html>
