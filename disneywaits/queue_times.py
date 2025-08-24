@@ -44,24 +44,28 @@ class QueueTimesClient:
         resp = await self.client.get(url)
         resp.raise_for_status()
         data = resp.json()
-        # Some endpoints return rides directly, others group by areas/lands.
-        if isinstance(data, dict):
-            if isinstance(data.get("rides"), list):
-                rides = data["rides"]
-            else:
-                areas = data.get("lands") or data.get("areas") or []
-                rides = []
-                for area in areas:
-                    rides.extend(area.get("rides", []))
-        elif isinstance(data, list):
-            rides = []
-            for area in data:
-                rides.extend(area.get("rides", []))
-        else:
-            rides = []
-        logger.debug("Park %s returned %d rides", park_id, len(rides))
+
+        def _collect(node: Any) -> List[Dict[str, Any]]:
+            rides: List[Dict[str, Any]] = []
+            if isinstance(node, dict):
+                if isinstance(node.get("rides"), list):
+                    rides.extend(node["rides"])
+                for key in ("lands", "areas"):
+                    for child in node.get(key, []) or []:
+                        rides.extend(_collect(child))
+            elif isinstance(node, list):
+                for child in node:
+                    rides.extend(_collect(child))
+            return rides
+
+        rides = _collect(data)
+        logger.debug(
+            "Flattened rides for park %s: %s", park_id, [r.get("name") for r in rides]
+        )
         if not rides:
             logger.warning("No rides found for park %s", park_id)
+        else:
+            logger.info("Park %s returned %d rides", park_id, len(rides))
         return rides
 
     async def close(self) -> None:

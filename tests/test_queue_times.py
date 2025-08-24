@@ -54,3 +54,18 @@ def test_fetch_wait_times_flattens(monkeypatch):
     }
     waits = asyncio.run(_fetch_waits(monkeypatch, payload))
     assert [r["id"] for r in waits] == [1, 2, 3]
+
+
+def test_fetch_wait_times_flattens_nested(monkeypatch):
+    payload = {
+        "lands": [
+            {
+                "areas": [
+                    {"rides": [{"id": 4}]},
+                    {"areas": [{"rides": [{"id": 5}]}]},
+                ]
+            }
+        ]
+    }
+    waits = asyncio.run(_fetch_waits(monkeypatch, payload))
+    assert [r["id"] for r in waits] == [4, 5]

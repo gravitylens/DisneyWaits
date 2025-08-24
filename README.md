@@ -36,3 +36,5 @@ Set the log level to `debug` to troubleshoot data collection. For example:
 ```bash
 uvicorn disneywaits.service:app --log-level debug
 ```
+This will log the flattened ride names for each park as they are fetched from
+queue-times, helping diagnose cases where no rides are returned.
