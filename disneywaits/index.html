@@ -35,6 +35,7 @@
       }
       const response = await fetch(`/wait_times?park_id=${parkId}&is_open=true`);
       let rides = await response.json();
+      rides = rides.filter(ride => ride.mean !== 0);
       rides.sort((a, b) => {
         if (a.is_unusually_low && !b.is_unusually_low) return -1;
         if (!a.is_unusually_low && b.is_unusually_low) return 1;

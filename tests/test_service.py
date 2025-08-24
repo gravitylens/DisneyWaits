@@ -56,6 +56,8 @@ def test_wait_times_filters():
     for _ in range(4):
         ride_a_stats.add_wait(10, now)
     ride_a_stats.add_wait(5, now)
+    ride_mean = ride_a_stats.mean()
+    ride_stdev = ride_a_stats.stdev()
 
     waits_open = service.wait_times(is_open=True)
     assert [w["id"] for w in waits_open] == ["10"]
@@ -65,6 +67,11 @@ def test_wait_times_filters():
     assert [w["id"] for w in waits_low] == ["10"]
     waits_not_low = service.wait_times(is_unusually_low=False)
     assert [w["id"] for w in waits_not_low] == ["11"]
+    assert [w["id"] for w in service.wait_times(id="10")] == ["10"]
+    assert [w["id"] for w in service.wait_times(name="Ride A")] == ["10"]
+    assert [w["id"] for w in service.wait_times(current_wait=5)] == ["10"]
+    assert [w["id"] for w in service.wait_times(mean=ride_mean)] == ["10"]
+    assert [w["id"] for w in service.wait_times(stdev=ride_stdev)] == ["10"]
 
 
 def test_wait_times_accepts_int_park_id():
@@ -74,6 +81,17 @@ def test_wait_times_accepts_int_park_id():
     asyncio.run(service.update())
     assert service.wait_times(1) == service.wait_times("1")
     assert service.wait_times(1, is_open=True)[0]["id"] == "10"
+
+
+def test_parks_filters():
+    global_service.parks = {
+        "1": ParkInfo(id="1", name="Test", rides={}),
+        "2": ParkInfo(id="2", name="Other", rides={}),
+    }
+    client = TestClient(app)
+    assert client.get("/parks").json() == {"1": "Test", "2": "Other"}
+    assert client.get("/parks", params={"id": "1"}).json() == {"1": "Test"}
+    assert client.get("/parks", params={"name": "Other"}).json() == {"2": "Other"}
 
 
 class FlippingClient:
@@ -97,10 +115,10 @@ def test_recently_opened_service():
 
     asyncio.run(service.update())  # ride closed
     asyncio.run(service.update())  # ride opens
-    waits = service.wait_times()
-    assert waits[0]["recently_opened"] is True
+    waits = service.wait_times(recently_opened=True)
+    assert [w["id"] for w in waits] == ["10"]
     asyncio.run(service.update())  # subsequent poll
-    assert service.wait_times()[0]["recently_opened"] is False
+    assert service.wait_times(recently_opened=True) == []
 
 
 def test_wait_times_endpoint():
@@ -119,6 +137,7 @@ def test_wait_times_endpoint():
     stats_a.add_wait(10, now)
     stats_a.add_wait(10, now)
     stats_a.add_wait(5, now)
+    stats_a.recently_opened = True
     stats_b = global_service.parks["1"].rides["11"].stats
     stats_b.mark_closed()
     client = TestClient(app)
@@ -129,7 +148,7 @@ def test_wait_times_endpoint():
     ride = next(r for r in data if r["id"] == "10")
     assert ride["current_wait"] == 5
     assert ride["is_open"] is True
-    assert ride["recently_opened"] is False
+    assert ride["recently_opened"] is True
     assert ride["is_unusually_low"] is True
     assert ride["mean"] == pytest.approx(8.333333333333334)
     assert ride["stdev"] == pytest.approx(2.886751345948129)
@@ -147,8 +166,11 @@ def test_wait_times_endpoint():
     assert client.get("/wait_times", params={"is_open": "true"}).json() == [ride]
     assert client.get("/wait_times", params={"is_open": "false"}).json() == [other]
     assert client.get("/wait_times", params={"is_unusually_low": "true"}).json() == [ride]
-    assert client.get(
-        "/wait_times",
-        params={"is_unusually_low": "false"},
-    ).json() == [other]
+    assert client.get("/wait_times", params={"is_unusually_low": "false"}).json() == [other]
+    assert client.get("/wait_times", params={"id": "10"}).json() == [ride]
+    assert client.get("/wait_times", params={"name": "Ride"}).json() == [ride]
+    assert client.get("/wait_times", params={"current_wait": 5}).json() == [ride]
+    assert client.get("/wait_times", params={"mean": ride["mean"]}).json() == [ride]
+    assert client.get("/wait_times", params={"stdev": ride["stdev"]}).json() == [ride]
+    assert client.get("/wait_times", params={"recently_opened": "true"}).json() == [ride]
 
