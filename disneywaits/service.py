@@ -83,22 +83,23 @@ class DisneyWaitsService:
         results = []
         for ride in rides:
             stats = ride.stats
-            if is_open is not None and stats.is_open != is_open:
+            entry = {
+                "id": ride.id,
+                "name": ride.name,
+                "current_wait": stats.current_wait,
+                "mean": stats.mean(),
+                "stdev": stats.stdev(),
+                "is_open": stats.is_open,
+                "recently_opened": stats.recently_opened,
+                "is_unusually_low": stats.is_unusually_low(),
+            }
+
+            if is_open is not None and entry["is_open"] != is_open:
                 continue
-            if is_unusually_low is not None and stats.is_unusually_low() != is_unusually_low:
+            if is_unusually_low is not None and entry["is_unusually_low"] != is_unusually_low:
                 continue
-            results.append(
-                {
-                    "id": ride.id,
-                    "name": ride.name,
-                    "current_wait": stats.current_wait,
-                    "mean": stats.mean(),
-                    "stdev": stats.stdev(),
-                    "is_open": stats.is_open,
-                    "recently_opened": stats.recently_opened,
-                    "is_unusually_low": stats.is_unusually_low(),
-                }
-            )
+
+            results.append(entry)
         return results
 
 client = QueueTimesClient()
