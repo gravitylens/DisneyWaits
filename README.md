@@ -41,3 +41,5 @@ uvicorn disneywaits.service:app --log-level debug
 ```
 This will log the flattened ride names for each park as they are fetched from
 queue-times, helping diagnose cases where no rides are returned.
+
+Powered by [Queue-Times.com](https://queue-times.com/en-US)
