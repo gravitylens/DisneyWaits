@@ -17,6 +17,8 @@ class QueueTimesClient:
         resp = await self.client.get(PARKS_URL)
         resp.raise_for_status()
         data = resp.json()
+        if isinstance(data, list):
+            return data
         return data.get("parks", data)
 
     async def fetch_wait_times(self, park_id: int | str) -> Dict[str, Any]:
