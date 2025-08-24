@@ -34,7 +34,7 @@ class DisneyWaitsService:
     async def update(self) -> None:
         parks_data = await self.client.fetch_parks()
         for park in parks_data:
-            park_id = park.get("id") or park.get("slug")
+            park_id = str(park.get("id") or park.get("slug"))
             park_name = park.get("name")
             park_info = self.parks.setdefault(park_id, ParkInfo(id=park_id, name=park_name))
             await self._update_park(park_info)
@@ -43,7 +43,7 @@ class DisneyWaitsService:
         rides = await self.client.fetch_wait_times(park.id)
         timestamp = datetime.now(UTC)
         for ride in rides:
-            ride_id = ride.get("id")
+            ride_id = str(ride.get("id"))
             name = ride.get("name")
             wait = ride.get("wait_time")
             is_open = ride.get("is_open", True) and ride.get("status", "") not in {"Closed", "Refurbishment"}
@@ -54,12 +54,19 @@ class DisneyWaitsService:
             else:
                 ride_info.stats.mark_closed()
 
-    def park_wait_times(self, park_id: int | str) -> List[dict]:
-        park = self.parks.get(park_id)
-        if not park:
-            return []
+    def wait_times(self, park_id: int | str | None = None) -> List[dict]:
+        rides: List[RideInfo] = []
+        if park_id is None:
+            for park in self.parks.values():
+                rides.extend(park.rides.values())
+        else:
+            park = self.parks.get(park_id)
+            if not park:
+                return []
+            rides = list(park.rides.values())
+
         results = []
-        for ride in park.rides.values():
+        for ride in rides:
             stats = ride.stats
             results.append(
                 {
@@ -72,6 +79,9 @@ class DisneyWaitsService:
                 }
             )
         return results
+
+    def park_wait_times(self, park_id: int | str) -> List[dict]:
+        return self.wait_times(park_id)
 
 
 client = QueueTimesClient()
@@ -108,7 +118,12 @@ async def parks() -> Dict[str, str]:
     return {str(p.id): p.name for p in service.parks.values()}
 
 
+@app.get("/wait_times")
+async def wait_times_endpoint(park_id: str | None = None) -> List[dict]:
+    return service.wait_times(park_id)
+
+
 @app.get("/parks/{park_id}/wait_times")
 async def wait_times(park_id: str) -> List[dict]:
-    return service.park_wait_times(park_id)
+    return service.wait_times(park_id)
 
