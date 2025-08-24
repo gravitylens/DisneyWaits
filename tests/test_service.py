@@ -67,3 +67,6 @@ def test_wait_times_endpoint():
     ]
     assert client.get("/wait_times", params={"park_id": "1"}).json() == data
     assert client.get("/wait_times", params={"park_id": "2"}).json() == []
+    assert client.get("/parks/wait_times").json() == data
+    assert client.get("/parks/wait_times", params={"park_id": "1"}).json() == data
+

@@ -17,9 +17,8 @@ uvicorn disneywaits.service:app --reload
 The service exposes:
 
 - `GET /parks` – list of known parks
-- `GET /wait_times?park_id={id}` – current wait times and statistics for all
-  rides, optionally filtered to a single park
-- `GET /parks/{park_id}/wait_times` – legacy endpoint equivalent to the above
+- `GET /wait_times?park_id={id}` or `/parks/wait_times` – current wait times
+  and statistics for all rides, optionally filtered to a single park
 
 ## Docker
 

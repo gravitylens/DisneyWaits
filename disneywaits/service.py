@@ -80,10 +80,6 @@ class DisneyWaitsService:
             )
         return results
 
-    def park_wait_times(self, park_id: int | str) -> List[dict]:
-        return self.wait_times(park_id)
-
-
 client = QueueTimesClient()
 service = DisneyWaitsService(client)
 app = FastAPI()
@@ -119,11 +115,7 @@ async def parks() -> Dict[str, str]:
 
 
 @app.get("/wait_times")
+@app.get("/parks/wait_times")
 async def wait_times_endpoint(park_id: str | None = None) -> List[dict]:
-    return service.wait_times(park_id)
-
-
-@app.get("/parks/{park_id}/wait_times")
-async def wait_times(park_id: str) -> List[dict]:
     return service.wait_times(park_id)
 
