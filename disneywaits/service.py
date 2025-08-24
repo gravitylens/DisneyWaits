@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Dict, List
@@ -78,16 +79,22 @@ class DisneyWaitsService:
 client = QueueTimesClient()
 service = DisneyWaitsService(client)
 app = FastAPI()
+logger = logging.getLogger(__name__)
 
 
 @app.on_event("startup")
 async def startup() -> None:
+    try:
+        await service.update()
+    except Exception:  # pragma: no cover - log and continue
+        logger.exception("Failed initial update")
+
     async def poller() -> None:
         while True:
             try:
                 await service.update()
-            except Exception:  # pragma: no cover - logging omitted for brevity
-                pass
+            except Exception:  # pragma: no cover - log and continue
+                logger.exception("Failed to update wait times")
             await asyncio.sleep(300)
 
     asyncio.create_task(poller())
