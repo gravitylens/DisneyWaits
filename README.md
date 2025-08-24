@@ -18,7 +18,9 @@ The service exposes:
 
 - `GET /parks` – list of known parks
 - `GET /wait_times?park_id={id}` or `/parks/wait_times` – current wait times
-  and statistics for all rides, optionally filtered to a single park
+  and statistics for all rides, optionally filtered to a single park. Each
+  ride entry includes an `is_open` flag indicating whether the ride is
+  currently operating.
 
 ## Docker
 

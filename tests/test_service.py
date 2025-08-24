@@ -38,7 +38,9 @@ def test_service_update_and_query():
     ride_a = next(r for r in waits_all if r["id"] == "10")
     ride_b = next(r for r in waits_all if r["id"] == "11")
     assert ride_a["current_wait"] == 5
+    assert ride_a["is_open"] is True
     assert ride_b["current_wait"] is None
+    assert ride_b["is_open"] is False
     assert service.wait_times("missing") == []
 
 
@@ -62,6 +64,7 @@ def test_wait_times_endpoint():
             "current_wait": 5,
             "mean": 5,
             "stdev": None,
+            "is_open": True,
             "is_unusually_low": False,
         }
     ]
