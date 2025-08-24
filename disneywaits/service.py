@@ -32,7 +32,11 @@ class DisneyWaitsService:
         self.parks: Dict[int | str, ParkInfo] = {}
 
     async def update(self) -> None:
+        logger.info("Refreshing park data")
         parks_data = await self.client.fetch_parks()
+        logger.info("Received %d parks from QueueTimes", len(parks_data))
+        if not parks_data:
+            logger.warning("No parks returned from QueueTimes")
         for park in parks_data:
             park_id = str(park.get("id") or park.get("slug"))
             park_name = park.get("name")
@@ -41,6 +45,9 @@ class DisneyWaitsService:
 
     async def _update_park(self, park: ParkInfo) -> None:
         rides = await self.client.fetch_wait_times(park.id)
+        logger.info("Updating %s (%s) with %d rides", park.name, park.id, len(rides))
+        if not rides:
+            logger.warning("No rides found for park %s", park.id)
         timestamp = datetime.now(UTC)
         for ride in rides:
             ride_id = str(ride.get("id"))
@@ -51,8 +58,10 @@ class DisneyWaitsService:
             if is_open and wait is not None:
                 ride_info.stats.mark_open()
                 ride_info.stats.add_wait(wait, timestamp)
+                logger.debug("Recorded wait %s for ride %s", wait, name)
             else:
                 ride_info.stats.mark_closed()
+                logger.debug("Skipping ride %s (open=%s wait=%s)", name, is_open, wait)
 
     def wait_times(self, park_id: int | str | None = None) -> List[dict]:
         rides: List[RideInfo] = []
@@ -84,6 +93,7 @@ client = QueueTimesClient()
 service = DisneyWaitsService(client)
 app = FastAPI()
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 @app.on_event("startup")

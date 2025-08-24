@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-import httpx
+import logging
 from typing import Any, Dict, List
+
+import httpx
 
 PARKS_URL = "https://queue-times.com/parks.json"
 PARK_QUEUE_URL = "https://queue-times.com/parks/{park_id}/queue_times.json"
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class QueueTimesClient:
@@ -23,9 +29,13 @@ class QueueTimesClient:
             groups = data.get("parks", [])  # type: ignore[assignment]
         else:
             groups = data
+        logger.debug("QueueTimes returned %d park groups", len(groups))
         for group in groups:
             if group.get("name") == "Walt Disney Attractions":
-                return group.get("parks", [])
+                parks = group.get("parks", [])
+                logger.info("Found %d Disney parks", len(parks))
+                return parks
+        logger.warning("Walt Disney Attractions group not found in parks list")
         return []
 
     async def fetch_wait_times(self, park_id: int | str) -> List[Dict[str, Any]]:
@@ -37,15 +47,21 @@ class QueueTimesClient:
         # Some endpoints return rides directly, others group by areas/lands.
         if isinstance(data, dict):
             if isinstance(data.get("rides"), list):
-                return data["rides"]
-            areas = data.get("lands") or data.get("areas") or []
+                rides = data["rides"]
+            else:
+                areas = data.get("lands") or data.get("areas") or []
+                rides = []
+                for area in areas:
+                    rides.extend(area.get("rides", []))
         elif isinstance(data, list):
-            areas = data
+            rides = []
+            for area in data:
+                rides.extend(area.get("rides", []))
         else:
-            areas = []
-        rides: List[Dict[str, Any]] = []
-        for area in areas:
-            rides.extend(area.get("rides", []))
+            rides = []
+        logger.debug("Park %s returned %d rides", park_id, len(rides))
+        if not rides:
+            logger.warning("No rides found for park %s", park_id)
         return rides
 
     async def close(self) -> None:

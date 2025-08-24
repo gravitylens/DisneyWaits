@@ -28,3 +28,11 @@ docker run -p 8000:8000 disneywaits
 ```
 
 The service polls the API every five minutes while running.
+
+### Debugging
+
+Set the log level to `debug` to troubleshoot data collection. For example:
+
+```bash
+uvicorn disneywaits.service:app --log-level debug
+```
