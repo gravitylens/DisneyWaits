@@ -11,16 +11,10 @@ class DummyClient:
         return [{"id": 1, "name": "Test Park"}]
 
     async def fetch_wait_times(self, park_id):
-        return {
-            "lands": [
-                {
-                    "rides": [
-                        {"id": 10, "name": "Ride A", "wait_time": 5, "is_open": True},
-                        {"id": 11, "name": "Ride B", "wait_time": 0, "is_open": False},
-                    ]
-                }
-            ]
-        }
+        return [
+            {"id": 10, "name": "Ride A", "wait_time": 5, "is_open": True},
+            {"id": 11, "name": "Ride B", "wait_time": 0, "is_open": False},
+        ]
 
 
 def test_service_update_and_query():

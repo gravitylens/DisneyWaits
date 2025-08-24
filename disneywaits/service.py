@@ -40,21 +40,19 @@ class DisneyWaitsService:
             await self._update_park(park_info)
 
     async def _update_park(self, park: ParkInfo) -> None:
-        data = await self.client.fetch_wait_times(park.id)
-        lands = data.get("lands", [])
+        rides = await self.client.fetch_wait_times(park.id)
         timestamp = datetime.now(UTC)
-        for land in lands:
-            for ride in land.get("rides", []):
-                ride_id = ride.get("id")
-                name = ride.get("name")
-                wait = ride.get("wait_time")
-                is_open = ride.get("is_open", True) and ride.get("status", "") not in {"Closed", "Refurbishment"}
-                ride_info = park.rides.setdefault(ride_id, RideInfo(id=ride_id, name=name))
-                if is_open and wait is not None:
-                    ride_info.stats.mark_open()
-                    ride_info.stats.add_wait(wait, timestamp)
-                else:
-                    ride_info.stats.mark_closed()
+        for ride in rides:
+            ride_id = ride.get("id")
+            name = ride.get("name")
+            wait = ride.get("wait_time")
+            is_open = ride.get("is_open", True) and ride.get("status", "") not in {"Closed", "Refurbishment"}
+            ride_info = park.rides.setdefault(ride_id, RideInfo(id=ride_id, name=name))
+            if is_open and wait is not None:
+                ride_info.stats.mark_open()
+                ride_info.stats.add_wait(wait, timestamp)
+            else:
+                ride_info.stats.mark_closed()
 
     def park_wait_times(self, park_id: int | str) -> List[dict]:
         park = self.parks.get(park_id)

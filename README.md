@@ -1,9 +1,11 @@
 # DisneyWaits
 
 Service that polls the [queue-times](https://queue-times.com) API for
-attraction wait times at Disney parks.  It keeps a five day running
-average and standard deviation for each ride and flags rides with a
-current wait more than one standard deviation below their average.
+attraction wait times at Disney parks. Only parks listed under "Walt Disney
+Attractions" are tracked and ride data is flattened across park areas.  It
+keeps a five day running average and standard deviation for each ride and
+flags rides with a current wait more than one standard deviation below their
+average.
 
 ## Running locally
 

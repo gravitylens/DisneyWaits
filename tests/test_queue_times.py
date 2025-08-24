@@ -13,7 +13,7 @@ class DummyResp:
     def raise_for_status(self):
         pass
 
-async def _fetch(monkeypatch, payload):
+async def _fetch_parks(monkeypatch, payload):
     client = QueueTimesClient()
     async def fake_get(url):
         return DummyResp(payload)
@@ -22,10 +22,35 @@ async def _fetch(monkeypatch, payload):
     await client.close()
     return parks
 
-def test_fetch_parks_list(monkeypatch):
-    parks = asyncio.run(_fetch(monkeypatch, [{"id": 1, "name": "Park"}]))
-    assert parks == [{"id": 1, "name": "Park"}]
+def test_fetch_parks_filters_wda(monkeypatch):
+    payload = [
+        {"name": "Other", "parks": [{"id": 1, "name": "Other Park"}]},
+        {"name": "Walt Disney Attractions", "parks": [
+            {"id": 10, "name": "Magic Kingdom"},
+            {"id": 11, "name": "Epcot"},
+        ]},
+    ]
+    parks = asyncio.run(_fetch_parks(monkeypatch, payload))
+    assert parks == [
+        {"id": 10, "name": "Magic Kingdom"},
+        {"id": 11, "name": "Epcot"},
+    ]
 
-def test_fetch_parks_dict(monkeypatch):
-    parks = asyncio.run(_fetch(monkeypatch, {"parks": [{"id": 2, "name": "Park2"}]}))
-    assert parks == [{"id": 2, "name": "Park2"}]
+async def _fetch_waits(monkeypatch, payload):
+    client = QueueTimesClient()
+    async def fake_get(url):
+        return DummyResp(payload)
+    monkeypatch.setattr(client.client, "get", fake_get)
+    waits = await client.fetch_wait_times(1)
+    await client.close()
+    return waits
+
+def test_fetch_wait_times_flattens(monkeypatch):
+    payload = {
+        "lands": [
+            {"rides": [{"id": 1}, {"id": 2}]},
+            {"rides": [{"id": 3}]},
+        ]
+    }
+    waits = asyncio.run(_fetch_waits(monkeypatch, payload))
+    assert [r["id"] for r in waits] == [1, 2, 3]
