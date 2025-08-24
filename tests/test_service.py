@@ -46,6 +46,27 @@ def test_service_update_and_query():
     assert service.wait_times("missing") == []
 
 
+def test_wait_times_filters():
+    service = DisneyWaitsService(DummyClient())
+    import asyncio
+
+    asyncio.run(service.update())
+    now = datetime.now(UTC)
+    ride_a_stats = service.parks["1"].rides["10"].stats
+    for _ in range(4):
+        ride_a_stats.add_wait(10, now)
+    ride_a_stats.add_wait(5, now)
+
+    waits_open = service.wait_times(is_open=True)
+    assert [w["id"] for w in waits_open] == ["10"]
+    waits_closed = service.wait_times(is_open=False)
+    assert [w["id"] for w in waits_closed] == ["11"]
+    waits_low = service.wait_times(is_unusually_low=True)
+    assert [w["id"] for w in waits_low] == ["10"]
+    waits_not_low = service.wait_times(is_unusually_low=False)
+    assert [w["id"] for w in waits_not_low] == ["11"]
+
+
 class FlippingClient:
     def __init__(self) -> None:
         self.calls = 0
@@ -78,28 +99,47 @@ def test_wait_times_endpoint():
         "1": ParkInfo(
             id="1",
             name="Test",
-            rides={"10": RideInfo(id="10", name="Ride", stats=RideStats())},
+            rides={
+                "10": RideInfo(id="10", name="Ride", stats=RideStats()),
+                "11": RideInfo(id="11", name="Other", stats=RideStats()),
+            },
         )
     }
-    global_service.parks["1"].rides["10"].stats.add_wait(5, datetime.now(UTC))
+    now = datetime.now(UTC)
+    stats_a = global_service.parks["1"].rides["10"].stats
+    stats_a.add_wait(10, now)
+    stats_a.add_wait(10, now)
+    stats_a.add_wait(5, now)
+    stats_b = global_service.parks["1"].rides["11"].stats
+    stats_b.mark_closed()
     client = TestClient(app)
     resp = client.get("/wait_times")
     assert resp.status_code == 200
     data = resp.json()
-    assert data == [
-        {
-            "id": "10",
-            "name": "Ride",
-            "current_wait": 5,
-            "mean": 5,
-            "stdev": None,
-            "is_open": True,
-            "recently_opened": False,
-            "is_unusually_low": False,
-        }
-    ]
+    assert len(data) == 2
+    ride = next(r for r in data if r["id"] == "10")
+    assert ride["current_wait"] == 5
+    assert ride["is_open"] is True
+    assert ride["recently_opened"] is False
+    assert ride["is_unusually_low"] is True
+    assert ride["mean"] == pytest.approx(8.333333333333334)
+    assert ride["stdev"] == pytest.approx(2.886751345948129)
+    other = next(r for r in data if r["id"] == "11")
+    assert other["current_wait"] is None
+    assert other["is_open"] is False
+    assert other["recently_opened"] is False
+    assert other["is_unusually_low"] is False
+    assert other["mean"] is None
+    assert other["stdev"] is None
     assert client.get("/wait_times", params={"park_id": "1"}).json() == data
     assert client.get("/wait_times", params={"park_id": "2"}).json() == []
     assert client.get("/parks/wait_times").json() == data
     assert client.get("/parks/wait_times", params={"park_id": "1"}).json() == data
+    assert client.get("/wait_times", params={"is_open": "true"}).json() == [ride]
+    assert client.get("/wait_times", params={"is_open": "false"}).json() == [other]
+    assert client.get("/wait_times", params={"is_unusually_low": "true"}).json() == [ride]
+    assert client.get(
+        "/wait_times",
+        params={"is_unusually_low": "false"},
+    ).json() == [other]
 

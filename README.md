@@ -17,11 +17,14 @@ uvicorn disneywaits.service:app --reload
 The service exposes:
 
 - `GET /parks` – list of known parks
-- `GET /wait_times?park_id={id}` or `/parks/wait_times` – current wait times
-  and statistics for all rides, optionally filtered to a single park. Each
-  ride entry includes an `is_open` flag indicating whether the ride is
-  currently operating and a `recently_opened` flag that is `true` only on the
-  first poll after a ride reopens.
+- `GET /wait_times` or `/parks/wait_times` – current wait times and
+  statistics for all rides. Query parameters allow filtering:
+  - `park_id` – restrict to a single park
+  - `is_open` – only rides matching the open/closed state
+  - `is_unusually_low` – only rides whose wait is >1 stdev below average
+  
+  Each ride entry includes `is_open`, `recently_opened`, and
+  `is_unusually_low` flags.
 
 ## Docker
 

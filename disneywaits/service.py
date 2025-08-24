@@ -63,7 +63,13 @@ class DisneyWaitsService:
                 ride_info.stats.mark_closed()
                 logger.debug("Skipping ride %s (open=%s wait=%s)", name, is_open, wait)
 
-    def wait_times(self, park_id: int | str | None = None) -> List[dict]:
+    def wait_times(
+        self,
+        park_id: int | str | None = None,
+        *,
+        is_open: bool | None = None,
+        is_unusually_low: bool | None = None,
+    ) -> List[dict]:
         rides: List[RideInfo] = []
         if park_id is None:
             for park in self.parks.values():
@@ -77,6 +83,10 @@ class DisneyWaitsService:
         results = []
         for ride in rides:
             stats = ride.stats
+            if is_open is not None and stats.is_open != is_open:
+                continue
+            if is_unusually_low is not None and stats.is_unusually_low() != is_unusually_low:
+                continue
             results.append(
                 {
                     "id": ride.id,
@@ -128,6 +138,10 @@ async def parks() -> Dict[str, str]:
 
 @app.get("/wait_times")
 @app.get("/parks/wait_times")
-async def wait_times_endpoint(park_id: str | None = None) -> List[dict]:
-    return service.wait_times(park_id)
+async def wait_times_endpoint(
+    park_id: str | None = None,
+    is_open: bool | None = None,
+    is_unusually_low: bool | None = None,
+) -> List[dict]:
+    return service.wait_times(park_id, is_open=is_open, is_unusually_low=is_unusually_low)
 
