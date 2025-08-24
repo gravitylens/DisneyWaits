@@ -23,3 +23,12 @@ def test_ride_stats_trim_history():
     stats.add_wait(10, old)
     stats.add_wait(20)
     assert len(stats.history) == 1
+
+
+def test_recently_opened_flag():
+    stats = RideStats()
+    stats.mark_closed()
+    stats.mark_open()
+    assert stats.recently_opened is True
+    stats.mark_open()
+    assert stats.recently_opened is False

@@ -85,6 +85,7 @@ class DisneyWaitsService:
                     "mean": stats.mean(),
                     "stdev": stats.stdev(),
                     "is_open": stats.is_open,
+                    "recently_opened": stats.recently_opened,
                     "is_unusually_low": stats.is_unusually_low(),
                 }
             )

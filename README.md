@@ -20,7 +20,8 @@ The service exposes:
 - `GET /wait_times?park_id={id}` or `/parks/wait_times` – current wait times
   and statistics for all rides, optionally filtered to a single park. Each
   ride entry includes an `is_open` flag indicating whether the ride is
-  currently operating.
+  currently operating and a `recently_opened` flag that is `true` only on the
+  first poll after a ride reopens.
 
 ## Docker
 

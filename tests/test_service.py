@@ -39,9 +39,38 @@ def test_service_update_and_query():
     ride_b = next(r for r in waits_all if r["id"] == "11")
     assert ride_a["current_wait"] == 5
     assert ride_a["is_open"] is True
+    assert ride_a["recently_opened"] is False
     assert ride_b["current_wait"] is None
     assert ride_b["is_open"] is False
+    assert ride_b["recently_opened"] is False
     assert service.wait_times("missing") == []
+
+
+class FlippingClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def fetch_parks(self):
+        return [{"id": 1, "name": "Test Park"}]
+
+    async def fetch_wait_times(self, park_id):
+        self.calls += 1
+        if self.calls == 1:
+            return [{"id": 10, "name": "Ride", "wait_time": 0, "is_open": False}]
+        else:
+            return [{"id": 10, "name": "Ride", "wait_time": 5, "is_open": True}]
+
+
+def test_recently_opened_service():
+    service = DisneyWaitsService(FlippingClient())
+    import asyncio
+
+    asyncio.run(service.update())  # ride closed
+    asyncio.run(service.update())  # ride opens
+    waits = service.wait_times()
+    assert waits[0]["recently_opened"] is True
+    asyncio.run(service.update())  # subsequent poll
+    assert service.wait_times()[0]["recently_opened"] is False
 
 
 def test_wait_times_endpoint():
@@ -65,6 +94,7 @@ def test_wait_times_endpoint():
             "mean": 5,
             "stdev": None,
             "is_open": True,
+            "recently_opened": False,
             "is_unusually_low": False,
         }
     ]

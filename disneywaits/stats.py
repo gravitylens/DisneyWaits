@@ -20,6 +20,7 @@ class RideStats:
         self.history: Deque[WaitEntry] = deque()
         self.current_wait: int | None = None
         self.is_open: bool = True
+        self.recently_opened: bool = False
 
     def add_wait(self, wait: int, timestamp: datetime | None = None) -> None:
         """Add a wait time sample.
@@ -34,8 +35,10 @@ class RideStats:
     def mark_closed(self) -> None:
         self.is_open = False
         self.current_wait = None
+        self.recently_opened = False
 
     def mark_open(self) -> None:
+        self.recently_opened = not self.is_open
         self.is_open = True
 
     def _trim_history(self, now: datetime) -> None:
