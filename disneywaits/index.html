@@ -16,6 +16,13 @@
     </thead>
     <tbody></tbody>
   </table>
+  <table id="closed-rides-table">
+    <thead>
+      <tr><th>Ride</th><th>Status</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p>Powered by <a href="https://queue-times.com/">Queue-Times.com</a></p>
   <script>
     async function loadParks() {
       const response = await fetch('/parks');
@@ -33,17 +40,20 @@
       if (!parkId) {
         return;
       }
-      const response = await fetch(`/wait_times?park_id=${parkId}&is_open=true`);
-      let rides = await response.json();
-      rides = rides.filter(ride => ride.mean !== 0);
-      rides.sort((a, b) => {
-        if (a.is_unusually_low && !b.is_unusually_low) return -1;
-        if (!a.is_unusually_low && b.is_unusually_low) return 1;
-        return (a.current_wait ?? 0) - (b.current_wait ?? 0);
-      });
-      const tbody = document.querySelector('#rides-table tbody');
-      tbody.innerHTML = '';
-      for (const ride of rides) {
+      const response = await fetch(`/wait_times?park_id=${parkId}`);
+      const rides = await response.json();
+
+      const openRides = rides
+        .filter(ride => ride.is_open && ride.mean !== 0)
+        .sort((a, b) => {
+          if (a.is_unusually_low && !b.is_unusually_low) return -1;
+          if (!a.is_unusually_low && b.is_unusually_low) return 1;
+          return (a.current_wait ?? 0) - (b.current_wait ?? 0);
+        });
+
+      const openBody = document.querySelector('#rides-table tbody');
+      openBody.innerHTML = '';
+      for (const ride of openRides) {
         const row = document.createElement('tr');
         const nameCell = document.createElement('td');
         nameCell.textContent = ride.name;
@@ -51,12 +61,34 @@
         waitCell.textContent = ride.current_wait;
         row.appendChild(nameCell);
         row.appendChild(waitCell);
-        tbody.appendChild(row);
+        openBody.appendChild(row);
+      }
+
+      const closedRides = rides.filter(ride => !ride.is_open);
+      const closedBody = document.querySelector('#closed-rides-table tbody');
+      closedBody.innerHTML = '';
+      for (const ride of closedRides) {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.textContent = ride.name;
+        const statusCell = document.createElement('td');
+        statusCell.textContent = 'Closed';
+        row.appendChild(nameCell);
+        row.appendChild(statusCell);
+        closedBody.appendChild(row);
       }
     }
 
+    let refreshTimer;
     document.getElementById('park-select').addEventListener('change', (e) => {
-      loadRides(e.target.value);
+      const parkId = e.target.value;
+      loadRides(parkId);
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+      }
+      if (parkId) {
+        refreshTimer = setInterval(() => loadRides(parkId), 60000);
+      }
     });
 
     loadParks();
