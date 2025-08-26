@@ -6,10 +6,11 @@ import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set, Tuple
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from sse_starlette.sse import EventSourceResponse
 from pathlib import Path
 
 from .queue_times import QueueTimesClient
@@ -35,6 +36,7 @@ class DisneyWaitsService:
         self.client = client
         self.parks: Dict[int | str, ParkInfo] = {}
         self.data_path = data_path or Path(__file__).with_name("data.json")
+        self._subscribers: List[Tuple[asyncio.Queue, Set[str]]] = []
 
     # ------------------ Persistence helpers ------------------
     def save(self) -> None:
@@ -114,6 +116,10 @@ class DisneyWaitsService:
                 ride_info.stats.mark_open()
                 ride_info.stats.add_wait(wait, timestamp)
                 logger.debug("Recorded wait %s for ride %s", wait, name)
+                if ride_info.stats.recently_opened:
+                    self._notify(ride_id, "opened", ride_info)
+                if ride_info.stats.is_unusually_low():
+                    self._notify(ride_id, "unusually_low", ride_info)
             else:
                 ride_info.stats.mark_closed()
                 logger.debug("Skipping ride %s (open=%s wait=%s)", name, is_open, wait)
@@ -157,6 +163,25 @@ class DisneyWaitsService:
             if matched:
                 results.append(entry)
         return results
+
+    def subscribe(self, ride_ids: Set[str]) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue()
+        self._subscribers.append((queue, ride_ids))
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        self._subscribers = [s for s in self._subscribers if s[0] is not queue]
+
+    def _notify(self, ride_id: str, event: str, ride: RideInfo) -> None:
+        data = {
+            "ride_id": ride_id,
+            "ride_name": ride.name,
+            "event": event,
+            "wait": ride.stats.current_wait,
+        }
+        for queue, ids in list(self._subscribers):
+            if not ids or ride_id in ids:
+                queue.put_nowait(data)
 
 client = QueueTimesClient()
 service = DisneyWaitsService(client)
@@ -224,6 +249,24 @@ async def wait_times_endpoint(
         recently_opened=recently_opened,
         is_unusually_low=is_unusually_low,
     )
+
+
+@app.get("/events")
+async def events(request: Request, ride_ids: str | None = None) -> EventSourceResponse:
+    ids = set(ride_ids.split(",")) if ride_ids else set()
+    queue = service.subscribe(ids)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                data = await queue.get()
+                yield {"event": data["event"], "data": json.dumps(data)}
+        finally:
+            service.unsubscribe(queue)
+
+    return EventSourceResponse(event_generator())
 
 
 @app.get("/", response_class=HTMLResponse)

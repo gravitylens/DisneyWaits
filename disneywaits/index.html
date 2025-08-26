@@ -48,6 +48,10 @@
       background: #f2f2f2;
     }
 
+    .low {
+      font-weight: bold;
+    }
+
     footer {
       text-align: center;
       font-size: 0.9rem;
@@ -87,6 +91,40 @@
   </div>
   <footer>Powered by <a href="https://queue-times.com/">Queue-Times.com</a></footer>
   <script>
+    let evtSource;
+
+    async function requestPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch (e) {}
+      }
+    }
+
+    function connectEvents(rideIds) {
+      if (evtSource) {
+        evtSource.close();
+      }
+      if (!rideIds.length) {
+        return;
+      }
+      const params = new URLSearchParams({ ride_ids: rideIds.join(',') });
+      evtSource = new EventSource('/events?' + params.toString());
+      evtSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const msg = data.event === 'opened'
+          ? `${data.ride_name} has opened`
+          : `${data.ride_name} wait is unusually low (${data.wait})`;
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(msg);
+        } else {
+          console.log(msg);
+        }
+      };
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (evtSource) evtSource.close();
+    });
+
     async function loadParks() {
       const response = await fetch('/parks');
       const parks = await response.json();
@@ -118,6 +156,9 @@
       openBody.innerHTML = '';
       for (const ride of openRides) {
         const row = document.createElement('tr');
+        if (ride.is_unusually_low) {
+          row.classList.add('low');
+        }
         const nameCell = document.createElement('td');
         nameCell.textContent = ride.name;
         const waitCell = document.createElement('td');
@@ -140,12 +181,15 @@
         row.appendChild(statusCell);
         closedBody.appendChild(row);
       }
+
+      connectEvents(rides.map(r => r.id));
     }
 
     let refreshTimer;
     document.getElementById('park-select').addEventListener('change', (e) => {
       const parkId = e.target.value;
       loadRides(parkId);
+      requestPermission();
       if (refreshTimer) {
         clearInterval(refreshTimer);
       }
