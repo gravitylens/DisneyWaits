@@ -2,7 +2,66 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Disney Wait Times</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-top: 0;
+    }
+
+    label,
+    select {
+      width: 100%;
+      font-size: 1rem;
+    }
+
+    select {
+      padding: 0.5rem;
+      margin: 0.5rem 0 1rem;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: #f2f2f2;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 480px) {
+      th,
+      td {
+        font-size: 0.9rem;
+        padding: 0.4rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <h1>Disney Wait Times</h1>
@@ -10,19 +69,23 @@
   <select id="park-select">
     <option value="">Select a park</option>
   </select>
-  <table id="rides-table">
-    <thead>
-      <tr><th>Ride</th><th>Wait Time</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <table id="closed-rides-table">
-    <thead>
-      <tr><th>Ride</th><th>Status</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <p>Powered by <a href="https://queue-times.com/">Queue-Times.com</a></p>
+  <div class="table-container">
+    <table id="rides-table">
+      <thead>
+        <tr><th>Ride</th><th>Wait Time</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="table-container">
+    <table id="closed-rides-table">
+      <thead>
+        <tr><th>Ride</th><th>Status</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <footer>Powered by <a href="https://queue-times.com/">Queue-Times.com</a></footer>
   <script>
     async function loadParks() {
       const response = await fetch('/parks');
