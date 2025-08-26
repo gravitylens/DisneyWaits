@@ -2,7 +2,66 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Disney Wait Times</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Disney Wait Time Shrinkinator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-top: 0;
+    }
+
+    label,
+    select {
+      width: 100%;
+      font-size: 1rem;
+    }
+
+    select {
+      padding: 0.5rem;
+      margin: 0.5rem 0 1rem;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: #f2f2f2;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 480px) {
+      th,
+      td {
+        font-size: 0.9rem;
+        padding: 0.4rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <h1>Disney Wait Times</h1>
@@ -10,12 +69,23 @@
   <select id="park-select">
     <option value="">Select a park</option>
   </select>
-  <table id="rides-table">
-    <thead>
-      <tr><th>Ride</th><th>Wait Time</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="table-container">
+    <table id="rides-table">
+      <thead>
+        <tr><th>Ride</th><th>Wait Time</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="table-container">
+    <table id="closed-rides-table">
+      <thead>
+        <tr><th>Ride</th><th>Status</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <footer>Powered by <a href="https://queue-times.com/">Queue-Times.com</a></footer>
   <script>
     async function loadParks() {
       const response = await fetch('/parks');
@@ -33,17 +103,20 @@
       if (!parkId) {
         return;
       }
-      const response = await fetch(`/wait_times?park_id=${parkId}&is_open=true`);
-      let rides = await response.json();
-      rides = rides.filter(ride => ride.mean !== 0);
-      rides.sort((a, b) => {
-        if (a.is_unusually_low && !b.is_unusually_low) return -1;
-        if (!a.is_unusually_low && b.is_unusually_low) return 1;
-        return (a.current_wait ?? 0) - (b.current_wait ?? 0);
-      });
-      const tbody = document.querySelector('#rides-table tbody');
-      tbody.innerHTML = '';
-      for (const ride of rides) {
+      const response = await fetch(`/wait_times?park_id=${parkId}`);
+      const rides = await response.json();
+
+      const openRides = rides
+        .filter(ride => ride.is_open && ride.mean !== 0)
+        .sort((a, b) => {
+          if (a.is_unusually_low && !b.is_unusually_low) return -1;
+          if (!a.is_unusually_low && b.is_unusually_low) return 1;
+          return (a.current_wait ?? 0) - (b.current_wait ?? 0);
+        });
+
+      const openBody = document.querySelector('#rides-table tbody');
+      openBody.innerHTML = '';
+      for (const ride of openRides) {
         const row = document.createElement('tr');
         const nameCell = document.createElement('td');
         nameCell.textContent = ride.name;
@@ -51,12 +124,34 @@
         waitCell.textContent = ride.current_wait;
         row.appendChild(nameCell);
         row.appendChild(waitCell);
-        tbody.appendChild(row);
+        openBody.appendChild(row);
+      }
+
+      const closedRides = rides.filter(ride => !ride.is_open);
+      const closedBody = document.querySelector('#closed-rides-table tbody');
+      closedBody.innerHTML = '';
+      for (const ride of closedRides) {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.textContent = ride.name;
+        const statusCell = document.createElement('td');
+        statusCell.textContent = 'Closed';
+        row.appendChild(nameCell);
+        row.appendChild(statusCell);
+        closedBody.appendChild(row);
       }
     }
 
+    let refreshTimer;
     document.getElementById('park-select').addEventListener('change', (e) => {
-      loadRides(e.target.value);
+      const parkId = e.target.value;
+      loadRides(parkId);
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+      }
+      if (parkId) {
+        refreshTimer = setInterval(() => loadRides(parkId), 60000);
+      }
     });
 
     loadParks();
