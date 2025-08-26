@@ -20,3 +20,11 @@ def test_index_filters_zero_mean():
     path = Path(__file__).resolve().parent.parent / "disneywaits" / "index.html"
     text = path.read_text()
     assert "ride.mean !== 0" in text
+
+
+def test_index_marks_low_waits_bold():
+    path = Path(__file__).resolve().parent.parent / "disneywaits" / "index.html"
+    text = path.read_text()
+    assert ".low {" in text
+    assert "font-weight: bold" in text
+    assert "row.classList.add('low')" in text

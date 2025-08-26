@@ -48,6 +48,10 @@
       background: #f2f2f2;
     }
 
+    .low {
+      font-weight: bold;
+    }
+
     footer {
       text-align: center;
       font-size: 0.9rem;
@@ -152,6 +156,9 @@
       openBody.innerHTML = '';
       for (const ride of openRides) {
         const row = document.createElement('tr');
+        if (ride.is_unusually_low) {
+          row.classList.add('low');
+        }
         const nameCell = document.createElement('td');
         nameCell.textContent = ride.name;
         const waitCell = document.createElement('td');
