@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Dict, List
@@ -11,7 +13,7 @@ from fastapi.responses import HTMLResponse
 from pathlib import Path
 
 from .queue_times import QueueTimesClient
-from .stats import RideStats
+from .stats import RideStats, WaitEntry
 
 
 @dataclass
@@ -29,9 +31,60 @@ class ParkInfo:
 
 
 class DisneyWaitsService:
-    def __init__(self, client: QueueTimesClient) -> None:
+    def __init__(self, client: QueueTimesClient, data_path: Path | None = None) -> None:
         self.client = client
         self.parks: Dict[int | str, ParkInfo] = {}
+        self.data_path = data_path or Path(__file__).with_name("data.json")
+
+    # ------------------ Persistence helpers ------------------
+    def save(self) -> None:
+        """Write current park data to disk."""
+        data: Dict[str, Any] = {}
+        for park_id, park in self.parks.items():
+            park_data: Dict[str, Any] = {"id": park.id, "name": park.name, "rides": {}}
+            for ride_id, ride in park.rides.items():
+                stats = ride.stats
+                ride_data = {
+                    "id": ride.id,
+                    "name": ride.name,
+                    "stats": {
+                        "history": [
+                            {"timestamp": entry.timestamp.isoformat(), "wait": entry.wait}
+                            for entry in stats.history
+                        ],
+                        "current_wait": stats.current_wait,
+                        "is_open": stats.is_open,
+                        "recently_opened": stats.recently_opened,
+                    },
+                }
+                park_data["rides"][ride_id] = ride_data
+            data[park_id] = park_data
+
+        self.data_path.parent.mkdir(parents=True, exist_ok=True)
+        self.data_path.write_text(json.dumps(data))
+
+    def load(self) -> None:
+        """Load park data from disk if available."""
+        if not self.data_path.exists():
+            return
+        raw = json.loads(self.data_path.read_text())
+        parks: Dict[int | str, ParkInfo] = {}
+        for park_id, pdata in raw.items():
+            park = ParkInfo(id=pdata["id"], name=pdata["name"])
+            for ride_id, rdata in pdata.get("rides", {}).items():
+                sdata = rdata.get("stats", {})
+                stats = RideStats()
+                stats.history = deque(
+                    WaitEntry(datetime.fromisoformat(e["timestamp"]), e["wait"])
+                    for e in sdata.get("history", [])
+                )
+                stats.current_wait = sdata.get("current_wait")
+                stats.is_open = sdata.get("is_open", True)
+                stats.recently_opened = sdata.get("recently_opened", False)
+                ride = RideInfo(id=rdata["id"], name=rdata["name"], stats=stats)
+                park.rides[ride_id] = ride
+            parks[park_id] = park
+        self.parks = parks
 
     async def update(self) -> None:
         logger.info("Refreshing park data")
@@ -114,6 +167,7 @@ logger.setLevel(logging.INFO)
 
 @app.on_event("startup")
 async def startup() -> None:
+    service.load()
     try:
         await service.update()
     except Exception:  # pragma: no cover - log and continue
@@ -132,6 +186,7 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    service.save()
     await client.close()
 
 
